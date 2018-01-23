@@ -9,56 +9,65 @@
 import UIKit
 
 class ItemTableViewController: UITableViewController {
-    
-   private var todoList = [ToDoItem]()
-    
-    private let defaults = UserDefaults.standard
+
+    var viewModel = ItemTableViewModel()
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        tableView.tableFooterView = UIView(frame: .zero)
-        fetchData()
-        
+        viewModel.fetchData()
+        configureView()
     }
-    
-    
+
+    func configureView() {
+        tableView.tableFooterView = UIView(frame: .zero)
+        let gradientLayer:CAGradientLayer = CAGradientLayer()
+        gradientLayer.frame = self.tableView.bounds
+
+        gradientLayer.colors =
+            [UIColor.red.withAlphaComponent(5).cgColor,UIColor.yellow.withAlphaComponent(0.5).cgColor]
+        let backgroundView = UIView(frame: self.tableView.bounds)
+        backgroundView.layer.insertSublayer(gradientLayer, at: 0)
+        self.tableView.backgroundView = backgroundView
+    }
+
     @IBAction func didTapAdd(_ sender: Any) {
-            let alert = UIAlertController(title: "New To-Do Item", message: "Insert the title of the new to-do item:", preferredStyle: .alert)
+        let alert = UIAlertController(title: viewModel.alertTitle, message: viewModel.alertMessage, preferredStyle: .alert)
         
-            alert.addTextField(configurationHandler: nil)
+        alert.addTextField(configurationHandler: nil)
         
-            alert.addAction(UIAlertAction(title: "OK", style: .default, handler: { (_) in
-                
-                if let title = alert.textFields![0].text {
-                    
-                    guard !title.isEmpty else { return }
-                    
-                    self.addNewToDoItem(title: title)
-                }
-            }))
+        alert.addAction(UIAlertAction(title: viewModel.actionTitle, style: .default, handler: { (_) in
+            
+            guard let todoTitle = alert.textFields![0].text else { return }
+            let newIndex = self.viewModel.todoList.count
+            self.viewModel.addToDo(todoTitle)
+            self.tableView.insertRows(at: [IndexPath(row: newIndex, section: 0)], with: .top)
+            self.viewModel.saveData()
+        }
+        ))
         
-            self.present(alert, animated: true, completion: nil)
-        
+        self.present(alert, animated: true, completion: nil)
+
     }
     
     // MARK: - Table view data source
-
+    
     override func numberOfSections(in tableView: UITableView) -> Int {
         return 1
     }
-
+    
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return todoList .count
+        return viewModel.todoList .count
     }
-
-   
+    
+    
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
         let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath)
+        cell.backgroundColor = UIColor.clear
         
-        if indexPath.row < todoList.count
+        if indexPath.row < viewModel.todoList.count
         {
-            let item = todoList[indexPath.row]
+            let item = viewModel.todoList[indexPath.row]
             cell.textLabel?.text = item.title
             
             //MARK: set the checkmark for item done
@@ -69,66 +78,32 @@ class ItemTableViewController: UITableViewController {
         
         return cell
     }
-
+    
     
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         
         tableView.deselectRow(at: indexPath, animated: true)
         
-        if indexPath.row < todoList.count {
-            todoList[indexPath.row].done = !todoList[indexPath.row].done
+        if indexPath.row < viewModel.todoList.count {
+
+            viewModel.toggleDone(row: indexPath.row)
             
             tableView.reloadRows(at: [indexPath], with: .automatic)
-            saveData()
         }
+        viewModel.saveData()
+
     }
+    
+    //MARK: functionality for delete rows
     
     override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCellEditingStyle, forRowAt indexPath: IndexPath) {
         
-        //MARK: functionality for delete rows
-        
-        if indexPath.row < todoList.count {
-            todoList.remove(at: indexPath.row)
+        if indexPath.row < viewModel.todoList.count {
+            viewModel.deleteItem(indexPath.row)
             tableView.deleteRows(at: [indexPath], with: .top)
-            saveData()
         }
-    }
-    
-    //MARK: functionality for add
+        viewModel.saveData()
 
-      private func addNewToDoItem(title: String) {
-        
-        let newIndex = todoList.count
-        todoList.append(ToDoItem(title: title))
-        tableView.insertRows(at: [IndexPath(row: newIndex, section: 0)], with: .top)
-        saveData()
     }
-    
-    //MARK: fetch data from user defaults
 
-    func fetchData() {
-        
-        if let list = defaults.value(forKey: "encodedList") as? [[String: Any]] {
-            
-            for item in list {
-                guard let todoItem = ToDoItem(item) else { return }
-                todoList.append(todoItem)
-            }
-        }
-    }
-    
-    
-    //MARK: Save data to user defaults
-    
-    func saveData() {
-        
-        var encodedList = [[String: Any]]()
-        
-        for item in todoList {
-            
-            encodedList.append(item.toPropertyList())
-        }
-        defaults.set(encodedList, forKey: "encodedList")
-    }
-    
 }
